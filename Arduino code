@@ -1,0 +1,100 @@
+//////Testing Code 
+#include <FirebaseESP8266.h>
+#include <TinyGPS++.h>
+#include <SoftwareSerial.h>
+#include <ESP8266WiFi.h>
+#define WIFI_SSID ""
+#define WIFI_PASSWORD ""
+// #define WIFI_PASSWORD ""
+// Insert Firebase project API Key
+#define API_KEY ""
+// Insert RTDB URLefine the RTDB URL */
+#define DATABASE_URL "URL"
+FirebaseData firebaseData;
+TinyGPSPlus gps;
+SoftwareSerial SerialGPS(4, 5);
+float Latitude, Longitude, Speedd;
+int year, month, date, hour, minute, second;
+String DateString, TimeString;
+void setup() {
+  Serial.begin(9600);
+  SerialGPS.begin(9600);
+  pinMode(A0, OUTPUT);
+  pinMode(D5, INPUT); // Setup for leads off detection LO +
+  pinMode(D6, INPUT); // Setup for leads off detection LO -
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(200);
+  }
+  Serial.println();
+  Serial.print("Connected to ");
+  Serial.println(WIFI_SSID);
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+  Firebase.begin(DATABASE_URL, API_KEY);
+  Firebase.reconnectWiFi(true);
+    delay(500);
+    Serial.println("Connecting to Firebase..");
+  }
+void loop(){
+while (SerialGPS.available() > 0){
+    if (gps.encode(SerialGPS.read()))
+      displayInfo();
+  }
+  if (millis() > 5000 && gps.charsProcessed() < 10) {
+    Serial.println(F("No GPS detected: check wiring."));
+  }
+  }
+void displayInfo() {
+  Serial.print(F("Location: "));
+  if (gps.location.isValid()) {
+   Latitude = gps.location.lat();
+  Longitude = gps.location.lng();
+  Serial.print("Latitude: "); 
+   Serial.println(Latitude, 6); 
+    Serial.print("Longitude: "); 
+     Serial.println(Longitude, 6);
+Firebase.setDouble(firebaseData, "/horse1/Data/lat", Latitude);
+ Firebase.setDouble(firebaseData, "/horse1/Data/lan", Longitude);
+    Serial.println("PUSHED lan");
+  }
+  else {
+    Serial.print(F("INVALID/"));
+ Firebase.setDouble(firebaseData, "/horse1/Data/lat", 25.989435);
+    Serial.println("PUSHED Custom value lat");
+ Firebase.setDouble(firebaseData, "/horse1/Data/lan", 50.479603);
+    Serial.println("PUSHED Custom value lng");
+  }
+  Serial.println();
+}
+unsigned long previousTime = 0;
+int calculateBPM(int data) {
+  // Store the current time
+  unsigned long currentTime = millis();
+  // Check if the sensor data is within the range of a valid ECG reading
+  // (e.g. between 0 and 1025)
+  if (data >= 0 && data <= 1025) {
+    // Check if this is the first reading
+    if (previousTime == 0) {
+      // This is the first reading, so store the current time
+      previousTime = currentTime;
+    } else {
+      // This is not the first reading, so calculate the time difference
+      // between the current and previous readings
+      unsigned long timeDiff = currentTime - previousTime;
+      // Check if the time difference is greater than the minimum BPM interval
+      // (e.g. if the BPM is 60, the minimum interval is 1000 milliseconds)
+      if (timeDiff >= 1000 / 60) {
+        // Calculate the BPM using the time difference and the known BPM range for horses
+        int bpm = 60000 / timeDiff; // timeDiff is in milliseconds, so we multiply by 60000 to convert to seconds
+        // Check if the BPM is within the normal range for horses (30-44 BPM at rest and up to 8 times that during movement)
+        if (bpm >= 30 && bpm <= 500) {
+          // The BPM is within the normal range, so return it
+          return bpm;
+        }}}}
+  // If we reach this point, thats mean the heart rate in abnormal and need to check
+  return 120;
+}
+
